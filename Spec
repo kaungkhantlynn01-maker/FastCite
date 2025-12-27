@@ -1,0 +1,277 @@
+FastCite — Final Spec Sheet (MVP v1.0, Streamlined, Google Docs only)
+1) Product name
+
+FastCite (working name)
+
+2) One-sentence purpose
+
+A Google Docs add-on that lets users paste a DOI/PMID/URL and cite instantly, while auto-saving the reference to a personal library and generating an AMA-style (numeric) bibliography on demand.
+
+3) Target user
+
+Medical students and researchers writing manuscripts in Google Docs who need fast AMA/Vancouver-like numeric citations without workflow friction.
+
+4) Problem statement
+
+Existing reference managers in Google Docs interrupt writing flow: inserting citations and fixing bibliographies takes too many steps, context switches, and manual corrections.
+
+5) Key product principle
+
+Cite-first, library-second
+
+The user should never be required to “save to library” before citing.
+
+Library updates happen automatically after citation insertion.
+
+6) Scope
+In scope (MVP)
+
+Google Docs add-on (sidebar UI)
+
+One-step “Quick Cite” input: DOI / PMID / URL
+
+Instant citation insertion at cursor (placeholder token)
+
+Automatic library creation + dedup + auto-save/update in background
+
+One-click “Update citations & bibliography”
+
+Single style: AMA numeric (simplified, deterministic)
+
+Explicitly out of scope
+
+Microsoft Word support
+
+PDF storage/annotation
+
+Collections/folders/tags
+
+Multiple styles
+
+Collaboration/sharing
+
+External accounts/login beyond Google permissions
+
+Perfect journal-specific AMA edge-case compliance (later)
+
+7) Primary user flows
+Flow A — Quick Cite (main workflow)
+
+User opens Google Doc → Extensions → FastCite
+
+Sidebar opens. User pastes DOI/PMID/URL and presses Enter (or clicks Cite).
+
+Add-on inserts placeholder at cursor: {{FASTCITE:ref_id}} (immediate)
+
+Add-on fetches metadata asynchronously and auto-saves reference into library (dedup rules apply).
+
+User continues writing with zero interruption.
+
+Flow B — Update citations & bibliography
+
+User clicks Update citations & bibliography
+
+Add-on scans doc for placeholders → assigns numbers → replaces placeholders with formatted numeric citations
+
+Bibliography is generated/updated at end under heading References
+
+Flow C — Library search + cite
+
+User searches in Library
+
+Click Cite → inserts placeholder at cursor (no metadata fetch needed)
+
+Flow D — Fix/refine metadata (only if needed)
+
+User opens Library
+
+Click Edit on a reference
+
+Save → affects next bibliography update
+
+8) UI requirements (sidebar)
+Always-visible Quick Cite bar (top)
+
+Input: “Paste DOI / PMID / URL”
+
+Primary button: Cite (Enter triggers)
+
+Status indicator: “Saved”, “Fetching…”, “Needs attention”
+
+Tabs
+
+Quick Cite (default)
+
+Recent citations (last 20)
+
+Issues list (pending/failed metadata)
+
+Library
+
+Search (title/author/journal/doi/pmid)
+
+List results + actions: Cite / Edit / Delete
+
+Document
+
+Button: Update citations & bibliography
+
+Summary: total cites + unique refs + unresolved refs
+
+Settings
+
+Bibliography heading text (default “References”)
+
+(MVP locked) Style: AMA numeric; in-text format: bracketed
+
+9) Functional requirements
+FR1 — Instant insertion
+
+On Cite action, placeholder is inserted within ≤ 2 seconds.
+
+FR2 — Metadata ingestion
+
+Accept DOI / PMID / URL.
+
+Fetch metadata to populate: title, authors, year, journal (plus optional volume/issue/pages).
+
+If fetch fails: store record as pending/failed and show in Issues.
+
+FR3 — Auto-library (no pre-save step)
+
+After placeholder insertion, reference is automatically created/updated in the personal library.
+
+FR4 — Dedup rules (must be deterministic)
+
+DOI input: dedup by normalized DOI
+
+PMID input: dedup by PMID
+
+URL-only input: after fetch, dedup by (normalized title + year + first author) best-effort
+If duplicate exists: reuse same ref_id, do not create a new record.
+
+FR5 — Document update engine
+
+“Update citations & bibliography” must:
+
+scan placeholders in reading order
+
+assign numbers by first appearance
+
+replace placeholders with [n]
+
+regenerate bibliography block (replace old FastCite-managed block)
+
+FR6 — Safe document edits
+
+Update must not alter non-citation content.
+
+If placeholders are manually edited/broken, mark as unresolved (do not crash).
+
+10) Citation formatting rules (MVP)
+Token format
+
+{{FASTCITE:<ref_id>}}
+
+In-text output
+
+Bracketed numeric: [1] (MVP)
+
+Multiple citations inserted sequentially will render as [1][2] (MVP; no range compression yet)
+
+Bibliography output (AMA-like simplified)
+
+Numbered list:
+
+Authors. Title. Journal. Year;Volume(Issue):Pages. DOI/URL.
+
+Author rule (MVP):
+
+Up to 6 authors shown; if >6, show first 3 + “et al.” (fixed rule)
+
+11) Data model
+Reference
+
+ref_id (string, stable)
+
+title (string or null)
+
+authors (array of strings)
+
+year (string/int or null)
+
+journal (string or null)
+
+volume, issue, pages (optional)
+
+doi (optional)
+
+pmid (optional)
+
+url (optional)
+
+status (ok | pending | failed)
+
+source_input (raw input string)
+
+created_at, updated_at
+
+Document state (optional)
+
+doc_id
+
+last_update_at
+
+unresolved_ref_ids (derived)
+
+12) Storage (library persistence)
+
+MVP default: one JSON file in the user’s Google Drive: fastcite_library.json
+
+Created on first run if missing
+
+Read/write on library operations
+
+No external accounts or backend required
+
+13) Permissions & constraints
+
+Needs access to:
+
+Google Docs document read/write (current doc)
+
+Google Drive read/write (library JSON)
+
+No patient-identifiable data
+
+No login beyond Google permissions
+
+14) Error handling requirements
+
+Invalid input → show “Couldn’t parse DOI/PMID/URL” + allow retry
+
+Fetch timeout/failure → citation placeholder still inserted; reference stored as failed with issue surfaced
+
+Corrupt/missing library file → create a fresh library + show recovery warning
+
+15) Acceptance criteria (pass/fail)
+
+Paste DOI/PMID/URL → placeholder inserted at cursor ≤ 2 seconds
+
+Reference auto-saved into library without user pressing “Save”
+
+Duplicate DOI/PMID does not create duplicate records
+
+Update citations & bibliography:
+
+numbers by first appearance
+
+reused refs keep same number
+
+bibliography regenerates under “References”
+
+works on a new Doc without errors
+
+Typical doc update completes ≤ 10 seconds (normal network + moderate doc size)
+
+Failed metadata does not break update; unresolved items are listed
