@@ -1,0 +1,237 @@
+<script>
+  const citeInput = document.getElementById('quickCiteInput');
+  const citeButton = document.getElementById('citeButton');
+  const citeStatus = document.getElementById('citeStatus');
+  const tabs = document.querySelectorAll('.tab');
+  const tabContents = document.querySelectorAll('.tab-content');
+  const recentList = document.getElementById('recentList');
+  const issuesList = document.getElementById('issuesList');
+  const librarySearch = document.getElementById('librarySearch');
+  const libraryList = document.getElementById('libraryList');
+  const updateDocButton = document.getElementById('updateDocButton');
+  const docStatus = document.getElementById('docStatus');
+  const docSummary = document.getElementById('docSummary');
+  const bibHeading = document.getElementById('bibHeading');
+  const saveSettingsButton = document.getElementById('saveSettings');
+  const settingsStatus = document.getElementById('settingsStatus');
+
+  function setStatus(text) {
+    citeStatus.textContent = text;
+  }
+
+  function showTab(tabName) {
+    tabs.forEach(tab => {
+      tab.classList.toggle('active', tab.dataset.tab === tabName);
+    });
+    tabContents.forEach(content => {
+      content.classList.toggle('active', content.id === `tab-${tabName}`);
+    });
+  }
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => showTab(tab.dataset.tab));
+  });
+
+  citeButton.addEventListener('click', () => {
+    const value = citeInput.value.trim();
+    if (!value) {
+      setStatus('Please paste a DOI, PMID, or URL.');
+      return;
+    }
+    setStatus('Inserted. Fetching metadata...');
+    google.script.run
+      .withSuccessHandler(result => {
+        if (!result.ok) {
+          setStatus(result.message || 'Could not insert citation.');
+          return;
+        }
+        citeInput.value = '';
+        refreshQuickCite();
+        if (result.needsFetch) {
+          google.script.run
+            .withSuccessHandler(fetchResult => {
+              setStatus(fetchResult.status === 'ok' ? 'Saved.' : 'Needs attention.');
+              refreshQuickCite();
+            })
+            .withFailureHandler(error => {
+              setStatus('Needs attention.');
+              console.error(error);
+            })
+            .fetchAndUpdateMetadata(result.ref_id);
+        } else {
+          setStatus('Saved.');
+        }
+      })
+      .withFailureHandler(error => {
+        setStatus('Could not insert citation.');
+        console.error(error);
+      })
+      .citeInput(value);
+  });
+
+  citeInput.addEventListener('keydown', event => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      citeButton.click();
+    }
+  });
+
+  function refreshQuickCite() {
+    google.script.run.withSuccessHandler(data => {
+      renderList(recentList, data.recent, true);
+      renderList(issuesList, data.issues, false);
+    }).getQuickCiteView();
+  }
+
+  function renderList(container, items, includeCite) {
+    container.innerHTML = '';
+    if (!items || items.length === 0) {
+      container.textContent = 'No items.';
+      return;
+    }
+    items.forEach(item => {
+      const div = document.createElement('div');
+      div.className = 'list-item';
+      const title = document.createElement('div');
+      title.textContent = item.title || item.doi || item.pmid || item.url || item.ref_id;
+      div.appendChild(title);
+      if (includeCite) {
+        const citeBtn = document.createElement('button');
+        citeBtn.className = 'secondary-btn';
+        citeBtn.textContent = 'Cite';
+        citeBtn.addEventListener('click', () => {
+          setStatus('Inserted from library.');
+          google.script.run
+            .withSuccessHandler(() => {
+              refreshQuickCite();
+            })
+            .withFailureHandler(error => {
+              setStatus('Could not insert citation.');
+              console.error(error);
+            })
+            .citeInput(item.doi || item.pmid || item.url || item.ref_id);
+        });
+        div.appendChild(citeBtn);
+      }
+      container.appendChild(div);
+    });
+  }
+
+  librarySearch.addEventListener('input', () => {
+    google.script.run.withSuccessHandler(data => {
+      renderLibraryList(data.refs || []);
+    }).getLibraryView(librarySearch.value);
+  });
+
+  function renderLibraryList(items) {
+    libraryList.innerHTML = '';
+    if (!items || items.length === 0) {
+      libraryList.textContent = 'No items.';
+      return;
+    }
+    items.forEach(item => {
+      const div = document.createElement('div');
+      div.className = 'list-item';
+      const title = document.createElement('div');
+      title.textContent = item.title || item.doi || item.pmid || item.url || item.ref_id;
+      div.appendChild(title);
+
+      const citeBtn = document.createElement('button');
+      citeBtn.className = 'secondary-btn';
+      citeBtn.textContent = 'Cite';
+      citeBtn.addEventListener('click', () => {
+        setStatus('Inserted from library.');
+        google.script.run
+          .withSuccessHandler(() => refreshQuickCite())
+          .withFailureHandler(error => {
+            setStatus('Could not insert citation.');
+            console.error(error);
+          })
+          .citeInput(item.doi || item.pmid || item.url || item.ref_id);
+      });
+      div.appendChild(citeBtn);
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'secondary-btn';
+      deleteBtn.textContent = 'Delete';
+      deleteBtn.addEventListener('click', () => {
+        google.script.run.withSuccessHandler(() => {
+          renderLibraryList(items.filter(ref => ref.ref_id !== item.ref_id));
+        }).deleteReference(item.ref_id);
+      });
+      div.appendChild(deleteBtn);
+
+      const editBtn = document.createElement('button');
+      editBtn.className = 'secondary-btn';
+      editBtn.textContent = 'Edit';
+      editBtn.addEventListener('click', () => {
+        const title = window.prompt('Edit title', item.title || '');
+        if (title === null) {
+          return;
+        }
+        const authors = window.prompt('Edit authors (comma separated)', (item.authors || []).join(', '));
+        const year = window.prompt('Edit year', item.year || '');
+        google.script.run.withSuccessHandler(updated => {
+          item.title = updated.title;
+          item.authors = updated.authors;
+          item.year = updated.year;
+          renderLibraryList(items);
+        }).updateReference(item.ref_id, {
+          title: title,
+          authors: authors ? authors.split(',').map(a => a.trim()).filter(Boolean) : [],
+          year: year || null
+        });
+      });
+      div.appendChild(editBtn);
+
+      libraryList.appendChild(div);
+    });
+  }
+
+  updateDocButton.addEventListener('click', () => {
+    docStatus.textContent = 'Updating citations...';
+    google.script.run
+      .withSuccessHandler(result => {
+        docStatus.textContent = 'Bibliography updated.';
+        docSummary.textContent = `Total citations: ${result.totalCitations}, unique refs: ${result.uniqueRefs}, unresolved: ${result.unresolved.length}`;
+      })
+      .withFailureHandler(error => {
+        docStatus.textContent = 'Update failed.';
+        console.error(error);
+      })
+      .updateCitationsAndBibliography();
+  });
+
+  function refreshSummary() {
+    google.script.run.withSuccessHandler(summary => {
+      docSummary.textContent = `Total citations: ${summary.totalCitations}, unique refs: ${summary.uniqueRefs}, unresolved: ${summary.unresolved}`;
+    }).getDocumentSummary();
+  }
+
+  saveSettingsButton.addEventListener('click', () => {
+    settingsStatus.textContent = 'Saving...';
+    google.script.run
+      .withSuccessHandler(settings => {
+        settingsStatus.textContent = 'Saved.';
+        bibHeading.value = settings.bibliographyHeading;
+      })
+      .saveSettings({ bibliographyHeading: bibHeading.value });
+  });
+
+  function loadSettings() {
+    google.script.run.withSuccessHandler(settings => {
+      bibHeading.value = settings.bibliographyHeading;
+    }).getSettings();
+  }
+
+  function init() {
+    refreshQuickCite();
+    refreshSummary();
+    loadSettings();
+    google.script.run.withSuccessHandler(data => {
+      renderLibraryList(data.refs || []);
+    }).getLibraryView('');
+  }
+
+  init();
+</script>
