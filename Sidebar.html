@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+      }
+      .quick-cite {
+        padding: 12px;
+        border-bottom: 1px solid #e0e0e0;
+        background: #fafafa;
+        position: sticky;
+        top: 0;
+        z-index: 2;
+      }
+      .quick-cite input {
+        width: 100%;
+        padding: 8px;
+        margin-bottom: 8px;
+        box-sizing: border-box;
+      }
+      .quick-cite button {
+        width: 100%;
+        padding: 8px;
+        background: #1a73e8;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .status {
+        margin-top: 6px;
+        font-size: 12px;
+        color: #666;
+      }
+      .tabs {
+        display: flex;
+        border-bottom: 1px solid #e0e0e0;
+      }
+      .tab {
+        flex: 1;
+        text-align: center;
+        padding: 8px 0;
+        cursor: pointer;
+        font-size: 12px;
+      }
+      .tab.active {
+        font-weight: bold;
+        border-bottom: 2px solid #1a73e8;
+      }
+      .tab-content {
+        padding: 12px;
+        display: none;
+      }
+      .tab-content.active {
+        display: block;
+      }
+      .list-item {
+        padding: 8px 0;
+        border-bottom: 1px solid #f0f0f0;
+      }
+      .list-item button {
+        margin-right: 6px;
+      }
+      .section-title {
+        font-weight: bold;
+        margin-top: 12px;
+      }
+      .secondary-btn {
+        background: #f1f3f4;
+        border: none;
+        padding: 6px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .primary-btn {
+        background: #1a73e8;
+        color: #fff;
+        border: none;
+        padding: 8px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .input-inline {
+        width: 100%;
+        padding: 6px;
+        margin-bottom: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="quick-cite">
+      <input id="quickCiteInput" type="text" placeholder="Paste DOI / PMID / URL" />
+      <button id="citeButton">Cite</button>
+      <div class="status" id="citeStatus">Ready.</div>
+    </div>
+
+    <div class="tabs">
+      <div class="tab active" data-tab="quick">Quick Cite</div>
+      <div class="tab" data-tab="library">Library</div>
+      <div class="tab" data-tab="document">Document</div>
+      <div class="tab" data-tab="settings">Settings</div>
+    </div>
+
+    <div class="tab-content active" id="tab-quick">
+      <div class="section-title">Recent citations</div>
+      <div id="recentList"></div>
+      <div class="section-title">Issues</div>
+      <div id="issuesList"></div>
+    </div>
+
+    <div class="tab-content" id="tab-library">
+      <input class="input-inline" id="librarySearch" type="text" placeholder="Search library" />
+      <div id="libraryList"></div>
+    </div>
+
+    <div class="tab-content" id="tab-document">
+      <button class="primary-btn" id="updateDocButton">Update citations & bibliography</button>
+      <div class="status" id="docStatus">No updates yet.</div>
+      <div class="section-title">Summary</div>
+      <div id="docSummary"></div>
+    </div>
+
+    <div class="tab-content" id="tab-settings">
+      <label for="bibHeading">Bibliography heading</label>
+      <input class="input-inline" id="bibHeading" type="text" placeholder="References" />
+      <div class="section-title">Style</div>
+      <div>AMA numeric (locked)</div>
+      <button class="primary-btn" id="saveSettings">Save Settings</button>
+      <div class="status" id="settingsStatus"></div>
+    </div>
+
+    <?!= include('Sidebar.js.html'); ?>
+  </body>
+</html>
